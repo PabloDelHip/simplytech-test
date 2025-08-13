@@ -1,0 +1,652 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Eventos API",
+    "version": "1.0.0",
+    "description": "API para gestionar usuarios y eventos"
+  },
+  "servers": [
+    { "url": "http://localhost:3000" }
+  ],
+  "tags": [
+    { "name": "Auth", "description": "Autenticación y emisión de tokens" },
+    { "name": "Users", "description": "Gestión de usuarios" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } }
+      },
+      "UserCreate": {
+        "type": "object",
+        "required": ["name", "email", "password"],
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 6 }
+        }
+      },
+      "AuthLoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 6 }
+        }
+      },
+      "AuthLoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "description": "JWT de autenticación" }
+        }
+      },
+      "EventCreate": {
+        "type": "object",
+        "required": ["name", "date", "location", "capacity"],
+        "properties": {
+          "name":      { "type": "string" },
+          "date":      { "type": "string", "format": "date-time", "description": "Debe ser futura" },
+          "location":  { "type": "string" },
+          "capacity":  { "type": "integer", "minimum": 0 }
+        }
+      },
+      "EventPublic": {
+        "type": "object",
+        "properties": {
+          "id":             { "type": "string" },
+          "name":           { "type": "string" },
+          "date":           { "type": "string", "format": "date-time" },
+          "location":       { "type": "string" },
+          "capacity":       { "type": "integer" },
+          "attendeesCount": { "type": "integer" },
+          "availability":   { "type": "integer" },
+          "ownerId":        { "type": "string" }
+        }
+      },
+      "UserPublic": {
+        "type": "object",
+        "properties": {
+          "id":    { "type": "string" },
+          "name":  { "type": "string" },
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "EventUpdate": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "name":     { "type": "string" },
+          "date":     { "type": "string", "format": "date-time" },
+          "location": { "type": "string" },
+          "capacity": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "EventRegisterResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "attendeesCount": { "type": "integer" },
+          "capacity": { "type": "integer" }
+        }
+      },
+      "UserUpdate": {
+        "type": "object",
+        "properties": {
+          "name":  { "type": "string" },
+          "email": { "type": "string", "format": "email" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "Iniciar sesión",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuthLoginRequest" },
+              "example": {
+                "email": "pablo5@example.com",
+                "password": "12345678"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthLoginResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Obtener mi perfil (usuario autenticado)",
+        "tags": ["Auth"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserPublic" },
+                "example": {
+                  "id": "689c0be5bd1bcb80b08aed34",
+                  "name": "Pablo",
+                  "email": "pablo5@example.com"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "post": {
+        "summary": "Crear evento",
+        "tags": ["Events"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EventCreate" },
+              "example": {
+                "name": "NodeConf2",
+                "date": "2025-09-11T10:00:00.000Z",
+                "location": "CDMX",
+                "capacity": 2
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EventPublic" }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos (p. ej. fecha pasada)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto (duplicado nombre+fecha)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Eliminar evento (solo propietario)",
+        "tags": ["Events"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "ID del evento"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Borrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": { "type": "boolean" },
+                    "id": { "type": "string" }
+                  }
+                },
+                "example": {
+                  "deleted": true,
+                  "id": "689c0e969ffb9da7613883cb"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Evento no encontrado o no autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/available": {
+      "get": {
+        "summary": "Listar eventos con lugares disponibles",
+        "tags": ["Events"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Fecha mínima (por defecto ahora)",
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/EventPublic" }
+                },
+                "example": [
+                  {
+                    "id": "66b0aa11ee22cc33dd44ff55",
+                    "name": "NodeConf2",
+                    "date": "2025-09-11T10:00:00.000Z",
+                    "location": "CDMX",
+                    "capacity": 2,
+                    "attendeesCount": 1,
+                    "availability": 1,
+                    "ownerId": "689c0be5bd1bcb80b08aed34"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{id}": {
+      "put": {
+        "summary": "Actualizar evento (solo propietario)",
+        "tags": ["Events"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "ID del evento"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EventUpdate" },
+              "example": {
+                "name": "NodeConf update",
+                "date": "2025-08-13T10:00:00.000Z",
+                "location": "CDMX",
+                "capacity": 300
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EventPublic" }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos (p. ej., fecha inválida)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "404": {
+            "description": "Evento no encontrado o no autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto (p. ej., capacidad menor a asistentes)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{id}/register": {
+      "delete": {
+        "summary": "Cancelar mi registro (unregister)",
+        "tags": ["Events"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "ID del evento"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registro cancelado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EventRegisterResponse" },
+                "example": {
+                  "id": "689c0310654d183192d3ed6f",
+                  "name": "NodeConf2",
+                  "attendeesCount": 0,
+                  "capacity": 2
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No estabas inscrito o evento no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Registrarme a un evento",
+        "tags": ["Events"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "ID del evento"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registrado correctamente",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EventRegisterResponse" },
+                "example": {
+                  "id": "689c0310654d183192d3ed6f",
+                  "name": "NodeConf2",
+                  "attendeesCount": 1,
+                  "capacity": 2
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Evento no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya estás registrado o el evento está lleno",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "post": {
+        "summary": "Crear usuario",
+        "tags": ["Users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UserCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Creado" },
+          "409": {
+            "description": "Email ya registrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Actualizar mi perfil",
+        "tags": ["Users"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UserUpdate" },
+              "example": {
+                "name": "Pablo (update)",
+                "email": "pablo.update@example.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserPublic" },
+                "example": {
+                  "id": "689c0be5bd1bcb80b08aed34",
+                  "name": "Pablo (update)",
+                  "email": "pablo.update@example.com"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos (solo name/email permitidos)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/events": {
+      "get": {
+        "summary": "Listar eventos creados por mí",
+        "tags": ["Users"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/EventPublic" }
+                },
+                "example": [
+                  {
+                    "id": "66b0aa11ee22cc33dd44ff55",
+                    "name": "NodeConf2",
+                    "date": "2025-09-11T10:00:00.000Z",
+                    "location": "CDMX",
+                    "capacity": 2,
+                    "attendeesCount": 1,
+                    "availability": 1,
+                    "ownerId": "689c0be5bd1bcb80b08aed34"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/events/registered": {
+      "get": {
+        "summary": "Listar eventos donde estoy registrado",
+        "tags": ["Users"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/EventPublic" }
+                },
+                "example": [
+                  {
+                    "id": "66b0bb22cc33dd44ee55ff66",
+                    "name": "JSConf",
+                    "date": "2025-10-05T15:00:00.000Z",
+                    "location": "CDMX",
+                    "capacity": 100,
+                    "attendeesCount": 42,
+                    "availability": 58,
+                    "ownerId": "689c0be5bd1bcb80b08aed34"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
