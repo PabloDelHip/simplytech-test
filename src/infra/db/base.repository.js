@@ -1,6 +1,5 @@
 import { getDb } from '../../config/db/mongo.db.js';
 import { ObjectId } from 'mongodb';
-import { sanitizeQuery, sanitizePatch, sanitizeMatch, escapeRegex as _escapeRegex } from '../../infra/db/security/mongoSanitize.js';
 import logger from '../../config/logger.js';
 
 export default class BaseRepository {
@@ -13,11 +12,6 @@ export default class BaseRepository {
 
   toObjectId(id) { return id instanceof ObjectId ? id : new ObjectId(String(id)); }
 
-  escapeRegex(str) { return _escapeRegex(str); }
-  sanitizeQuery(obj, opts) { return sanitizeQuery(obj, opts); }
-  sanitizePatch(obj) { return sanitizePatch(obj); }
-  sanitizeMatch(obj, opts) { return sanitizeMatch(obj, opts); }
-
   async create(doc) {
     logger.debug(`[${this.collectionName}] Creando documento: ${JSON.stringify(doc)}`);
     if (doc?.userId) doc.userId = this.toObjectId(doc.userId);
@@ -26,30 +20,26 @@ export default class BaseRepository {
     return { _id: res.insertedId, ...doc };
   }
 
-  async findOne(filter = {}, options = {}, secure = {}) {
+  async findOne(filter = {}, options = {}) {
     logger.debug(`[${this.collectionName}] Buscando un documento con filtro: ${JSON.stringify(filter)}`);
-    const clean = sanitizeQuery(filter, secure);
-    return this.col.findOne(clean, options);
+    return this.col.findOne(filter, options);
   }
 
-  async findMany(filter = {}, options = {}, secure = {}) {
+  async findMany(filter = {}, options = {}) {
     logger.debug(`[${this.collectionName}] Buscando múltiples documentos con filtro: ${JSON.stringify(filter)}`);
-    const clean = sanitizeQuery(filter, secure);
     const { projection, sort, limit, skip } = options || {};
-    let cursor = this.col.find(clean, { projection });
+    let cursor = this.col.find(filter, { projection });
     if (sort) cursor = cursor.sort(sort);
     if (skip) cursor = cursor.skip(skip);
     if (limit) cursor = cursor.limit(limit);
     return cursor.toArray();
   }
 
-  async updateOne(filter, patch, options = { returnDocument: 'after' }, secure = {}) {
+  async updateOne(filter, patch, options = { returnDocument: 'after' }) {
     logger.debug(`[${this.collectionName}] Actualizando documento con filtro: ${JSON.stringify(filter)}, patch: ${JSON.stringify(patch)}`);
-    const cleanFilter = sanitizeQuery(filter, secure);
-    const cleanPatch  = sanitizePatch(patch);
     const res = await this.col.findOneAndUpdate(
-      cleanFilter,
-      { $set: cleanPatch },
+      filter,
+      { $set: patch },
       { returnDocument: options.returnDocument }
     );
     logger.debug(`[${this.collectionName}] Documento actualizado: ${JSON.stringify(res.value)}`);
@@ -71,10 +61,9 @@ export default class BaseRepository {
     return this.col.aggregate(pipeline, options).toArray();
   }
 
-  async deleteOne(filter = {}, options = {}, secure = {}) {
+  async deleteOne(filter = {}, options = {}) {
     logger.debug(`[${this.collectionName}] Eliminando documento con filtro: ${JSON.stringify(filter)}`);
-    const clean = sanitizeQuery(filter, secure);
-    const res = await this.col.findOneAndDelete(clean, options);
+    const res = await this.col.findOneAndDelete(filter, options);
     logger.debug(`[${this.collectionName}] Documento eliminado: ${JSON.stringify(res.value)}`);
     return res;
   }

@@ -60,8 +60,6 @@ src/
     logger.js               # logger (Winston)
   infra/
     db/
-      security/
-        mongoSanitize.js    # sanitizado de queries/parches para Mongo
       base.repository.js    # clase base para repositorios (CRUD + helpers)
     docs/
       openapi.json          # especificación Swagger/OpenAPI
